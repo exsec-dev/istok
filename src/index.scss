@@ -1,0 +1,21 @@
+:root {
+  --bg-color: #ffffff;
+  --primary-color: #1153ec;
+  --hover-primary-color: #6994ff;
+  --light-grey-color: #f2f3f7;
+  --light-hover-grey-color: #ecedf1;
+  --light-blue-color: #e8f0fd;
+  --light-hover-blue-color: #e1eaf9;
+  --grey-color: #777a8e;
+  --secondary-color: #b2b1c3;
+  --text-color: #201d30;
+  --header-text-color: #3d3952;
+  --success-color: #54c26c;
+  --warning-color: #fa8f14;
+  --error-color: #f5222d;
+}
+
+.layout {
+  padding: 0 72px;
+  gap: 24px;
+}

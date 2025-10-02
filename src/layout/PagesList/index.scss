@@ -1,0 +1,13 @@
+.image-label {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  background-color: var(--header-text-color);
+  color: var(--light-blue-color);
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+.ant-list .ant-row {
+  align-items: flex-end;
+}

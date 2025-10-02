@@ -1,0 +1,30 @@
+td.actions-column {
+  padding: 11px !important;
+}
+
+th.actions-column {
+  font-weight: 700 !important;
+}
+
+span.ant-table-column-title {
+  color: var(--header-text-color);
+  font-weight: 700;
+}
+
+th.ant-table-selection-column {
+  vertical-align: top;
+}
+
+th.actions-row {
+  padding: 16px 12px 6px !important;
+}
+
+.ant-table-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--light-hover-grey-color) transparent;
+  scrollbar-gutter: stable;
+}
+
+.ant-pagination-total-text {
+  flex: 1 !important;
+}

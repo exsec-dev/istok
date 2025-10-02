@@ -1,0 +1,31 @@
+.pagedata-collapse {
+  .ant-collapse-content-box {
+    padding: 4px 16px 16px !important;
+  }
+
+  .ant-collapse-header {
+    padding: 4px 16px;
+  }
+
+  .text-card {
+    height: 300px;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--light-hover-grey-color) transparent;
+    scrollbar-gutter: stable;
+
+    .ant-card-body {
+      padding: 10px 12px;
+    }
+  }
+
+  .ant-collapse-content-box:has(.attributes-card) {
+    padding-bottom: 0 !important;
+  }
+
+  .ant-collapse-header .ant-btn {
+    font-size: 13px;
+    height: 26px;
+    padding: 4px 10px;
+  }
+}

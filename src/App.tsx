@@ -1,25 +1,27 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import { App as AntdApp, ConfigProvider } from "antd";
+import ruRU from "antd/locale/ru_RU";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { RootLayout, DocumentsTable, Document } from "layout";
+import { getTheme } from "utils";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <AntdApp>
+      <ConfigProvider theme={getTheme()} locale={ruRU}>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<RootLayout />}>
+              <Route path="/" element={<DocumentsTable />} />
+              <Route path=":id" element={<Document />} />
+              <Route path=":id/:number" element={<Document isSinglePage />} />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ConfigProvider>
+    </AntdApp>
   );
 }
 

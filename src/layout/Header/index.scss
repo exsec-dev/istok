@@ -1,0 +1,8 @@
+.header {
+  padding: 44px 0 0;
+  height: 108px;
+
+  .ant-btn-link:not(:disabled):hover {
+    color: var(--hover-primary-color) !important;
+  }
+}

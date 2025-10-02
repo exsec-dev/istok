@@ -1,0 +1,8 @@
+.ant-upload-list {
+  max-height: 200px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--light-hover-grey-color) transparent;
+  scrollbar-gutter: stable;
+  margin-top: 8px;
+}

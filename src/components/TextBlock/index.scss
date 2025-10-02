@@ -1,0 +1,17 @@
+.text-block {
+  display: block;
+  width: 100%;
+  height: auto;
+  white-space: normal;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+
+  &:hover {
+    background-color: var(--light-hover-grey-color) !important;
+  }
+
+  & div {
+    margin-bottom: 0;
+    text-align: left;
+  }
+}
