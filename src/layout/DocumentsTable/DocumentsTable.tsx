@@ -111,9 +111,12 @@ export const DocumentsTable = () => {
       handleError(notification);
     },
   });
-  const handleDownload = useCallback((ids: string[]) => {
-    return downloadMutation.mutateAsync(ids);
-  }, []);
+  const handleDownload = useCallback(
+    (ids: string[]) => {
+      return downloadMutation.mutateAsync(ids);
+    },
+    [downloadMutation]
+  );
 
   const actions = useMemo(
     () => (

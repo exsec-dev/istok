@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { App, Empty, Skeleton, List, Card, Image, Spin } from "antd";
+import { App, Empty, List, Card, Image, Spin } from "antd";
 import { LoadingOutlined } from "@ant-design/icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import {

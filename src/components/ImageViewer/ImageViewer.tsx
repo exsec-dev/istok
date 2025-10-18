@@ -120,7 +120,7 @@ export const ImageViewer = ({
     if (zoomBlockId && highlightPoints) {
       zoomToBlock(highlightPoints);
     }
-  }, [zoomBlockId, zoomToBlock]);
+  }, [zoomBlockId, zoomToBlock, highlightPoints]);
 
   useEffect(() => {
     fitWidth();
