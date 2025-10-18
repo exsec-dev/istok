@@ -4,9 +4,14 @@ import { PointsType } from "utils";
 interface HighlightBlockProps {
   points: PointsType;
   scale?: number;
+  color: string;
 }
 
-export function HighlightBlock({ points, scale = 1 }: HighlightBlockProps) {
+export function HighlightBlock({
+  points,
+  scale = 1,
+  color,
+}: HighlightBlockProps) {
   const strokeWidth = Math.max(1, 2 / scale);
   const pts = points.map((p) => `${p.x},${p.y}`).join(" ");
 
@@ -23,7 +28,7 @@ export function HighlightBlock({ points, scale = 1 }: HighlightBlockProps) {
       <polygon
         points={pts}
         fill="#e1eaf930"
-        stroke="var(--light-hover-blue-color)"
+        stroke={color}
         strokeWidth={strokeWidth}
         vectorEffect="non-scaling-stroke"
         opacity={0.9}

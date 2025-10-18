@@ -5,3 +5,5 @@ export * from "./DocumentHeader";
 export * from "./ImageViewer";
 export * from "./TextBlock";
 export * from "./HighlightBlock";
+export * from "./ErrorBoundary";
+export * from "./ExportModal";

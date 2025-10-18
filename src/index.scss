@@ -15,6 +15,10 @@
   --error-color: #f5222d;
 }
 
+html {
+  overflow-y: auto;
+}
+
 .layout {
   padding: 0 72px;
   gap: 24px;

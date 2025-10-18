@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   App,
@@ -9,47 +9,59 @@ import {
   Skeleton,
   Collapse,
   Pagination,
-  Input,
   Empty,
   Card,
+  Spin,
   type CollapseProps,
 } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import { DownloadOutlined } from "@ant-design/icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BackArrowIcon, ImageViewer, TextBlock } from "components";
+import { BackArrowIcon, ImageViewer, TextBlock, ExportModal } from "components";
 import {
   useAxios,
   handleSuccess,
   handleError,
+  getConfidenceObj,
+  blocksPreprocess,
+  ROUTE_PATHS,
   type PageDataType,
   type DocumentType,
   type TextType,
+  type GetDTO,
 } from "utils";
 import "./index.scss";
 
-const getConfidenceColor = (confidence: number, min: number, max: number) => {
-  if (confidence >= max) return "var(--success-color)";
-  if (confidence >= min) return "var(--warning-color)";
-  return "var(--error-color)";
-};
-
 interface PageViewerProps {
   documentId: string;
-  documentData: DocumentType | undefined;
+  documentData?: DocumentType;
+  search?: string;
 }
 
-export const PageViewer = ({ documentId, documentData }: PageViewerProps) => {
+export const PageViewer = ({
+  documentId,
+  documentData,
+  search,
+}: PageViewerProps) => {
   const axios = useAxios();
   const navigate = useNavigate();
   const { number } = useParams();
   const pageNumber = number ? parseInt(number, 10) : 0;
   const { notification } = App.useApp();
 
-  const [isEdit, setIsEdit] = useState<boolean>(false);
   const [selectedNode, setSelectedNode] = useState<TextType>();
-  const newTextBlocks = useRef<TextType[]>([]);
+  const [zoomBlockId, setZoomBlockId] = useState<string>();
+  const [editNode, setEditNode] = useState<TextType>();
 
-  const { data, isLoading, refetch } = useQuery<PageDataType | undefined>({
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    setSelectedNode(undefined);
+    setEditNode(undefined);
+  }, [pageNumber]);
+
+  const { data, isLoading, isFetching, isRefetching, refetch } = useQuery<
+    GetDTO<PageDataType>
+  >({
     queryKey: ["list", documentId, pageNumber],
     queryFn: async () => {
       try {
@@ -59,6 +71,10 @@ export const PageViewer = ({ documentId, documentData }: PageViewerProps) => {
             page: pageNumber - 1,
           },
         });
+        const fullText = data.data?.[0].fullText
+          ? blocksPreprocess(data.data?.[0].fullText as string)
+          : undefined;
+        data.data = [{ ...data.data[0], fullText }];
         return data;
       } catch (e) {
         handleError(notification);
@@ -67,157 +83,160 @@ export const PageViewer = ({ documentId, documentData }: PageViewerProps) => {
     },
     refetchOnWindowFocus: false,
     retry: 0,
-    placeholderData: (prev) => prev,
+    refetchInterval: (query) =>
+      query.state.data?.data?.[0]?.fullText === undefined ? 2500 : false,
   });
   const pageData = useMemo(() => data?.data?.[0], [data]);
 
   const changeMutation = useMutation({
-    mutationFn: async (values: PageDataType["data"][number]) => {
-      // return await axios.post(`/documents/${id}`, {
-      //   file: null,
-      // });
-      console.log("update page: ", values);
+    mutationFn: async (values: TextType[]) => {
+      return await axios.patch(
+        `/documents/${documentId}/${pageData?.id ?? ""}`,
+        JSON.stringify(JSON.stringify(values)),
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     },
     onSuccess: () => {
       refetch();
       handleSuccess(notification);
-      setIsEdit(false);
-      newTextBlocks.current = [];
     },
     onError: () => {
       handleError(notification);
     },
   });
-  const handleSubmit = () => {
-    if (!pageData) return;
-
-    return changeMutation.mutateAsync({
-      ...pageData,
-      fullText: newTextBlocks.current,
-    });
-  };
+  const handleSubmit = useCallback(
+    (values: TextType[]) => {
+      return changeMutation.mutateAsync(values);
+    },
+    [changeMutation]
+  );
 
   const avgConfidence = useMemo(() => {
-    const attrs = pageData?.attrs;
-    if (!attrs || attrs.length === 0) return 0;
+    const blocks = pageData?.fullText;
+    if (!blocks || blocks.length === 0) return 0;
 
-    const total = attrs.reduce((sum, attr) => sum + (attr.confidence || 0), 0);
-    return total / attrs.length;
+    const total = blocks.reduce(
+      (sum, block) => sum + (block.confidence || 0),
+      0
+    );
+    return (total / blocks.length) * 100;
   }, [pageData]);
 
   const lowConfidenceCount = useMemo(() => {
-    const attrs = pageData?.attrs;
-    if (!attrs || attrs.length === 0) return 0;
+    const blocks = pageData?.fullText;
+    if (!blocks || blocks.length === 0) return "—";
 
-    return attrs.filter(
-      (attr) => (attr.confidence || 0) < (documentData?.min ?? 0.05),
+    return blocks.filter(
+      (block) => block.confidence * 100 < (documentData?.min ?? 30)
     ).length;
   }, [pageData, documentData]);
 
-  const items: CollapseProps["items"] = useMemo(
-    () => [
-      {
-        key: "text",
-        label: (
-          <Typography.Title level={5} style={{ margin: 0, fontWeight: 650 }}>
-            Текст образа
-          </Typography.Title>
-        ),
-        children: (
-          <Card className="text-card">
-            {pageData?.fullText?.length ? (
-              pageData.fullText.map((block) =>
-                isEdit ? (
-                  <Input
-                    key={block.id}
-                    variant="underlined"
-                    defaultValue={block.text}
-                    onChange={(e) => {
-                      const text = e.target.value;
-                      newTextBlocks.current = newTextBlocks.current.map((b) =>
-                        b.id === block.id ? { ...b, text } : b,
-                      );
-                    }}
-                    style={{ marginBottom: 12 }}
-                  />
-                ) : (
-                  <TextBlock
-                    key={block.id}
-                    text={block.text}
-                    isSelected={selectedNode?.id === block.id}
-                    onSelect={() =>
-                      setSelectedNode((value) =>
-                        value?.id === block.id ? undefined : block,
-                      )
+  const textBlocks = useMemo(() => {
+    const blocks = search
+      ? pageData?.fullText?.filter?.((block) =>
+          block.text.toLocaleLowerCase().includes(search)
+        )
+      : pageData?.fullText;
+
+    if (blocks?.length) {
+      return blocks.map((block) => (
+        <TextBlock
+          key={block.id}
+          text={block.text}
+          isSelected={selectedNode?.id === block.id}
+          isEdited={!!block?.edited}
+          onSelect={(zoom) => {
+            setSelectedNode((value) =>
+              value?.id === block.id ? undefined : block
+            );
+            if (zoom) {
+              setZoomBlockId(block.id);
+            }
+          }}
+          isEdit={editNode?.id === block.id}
+          onEditStart={() => {
+            setEditNode(block);
+            setSelectedNode(block);
+          }}
+          onEditFinish={(newText, toRemove) => {
+            setEditNode(undefined);
+
+            let newBlocks = blocks;
+            if (toRemove) {
+              newBlocks = newBlocks.filter((b) => b.id !== block.id);
+            } else if (newText) {
+              newBlocks = newBlocks.map((b) =>
+                b.id === block.id
+                  ? {
+                      ...b,
+                      text: newText,
+                      edited: true,
                     }
-                  />
-                ),
-              )
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                style={{ marginTop: 65 }}
-              />
-            )}
-          </Card>
-        ),
-        extra: isEdit ? (
-          <Flex gap={8}>
-            <Button
-              size="small"
-              onClick={(event) => {
-                event.stopPropagation();
-                setIsEdit(false);
-                newTextBlocks.current = [];
-              }}
-            >
-              Отмена
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              onClick={(event) => {
-                event.stopPropagation();
-                return handleSubmit();
-              }}
-            >
-              Сохранить
-            </Button>
-          </Flex>
-        ) : (
-          <Button
-            color="primary"
-            variant="outlined"
-            size="small"
-            icon={<EditOutlined />}
-            disabled={!pageData?.fullText?.length}
-            onClick={(event) => {
-              event.stopPropagation();
-              setIsEdit(true);
-              setSelectedNode(undefined);
-              newTextBlocks.current = pageData?.fullText || [];
-            }}
-          >
-            Редактировать
-          </Button>
-        ),
-      },
-      {
-        key: "attributes",
-        label: (
-          <Typography.Title level={5} style={{ margin: 0, fontWeight: 650 }}>
-            Атрибуты образа
-          </Typography.Title>
-        ),
-        children: (
-          <Card className="attributes-card">
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
-          </Card>
-        ),
-      },
-    ],
-    [pageData, selectedNode, isEdit],
-  );
+                  : b
+              );
+              setSelectedNode(() => ({
+                ...block,
+                edited: true,
+              }));
+            }
+            handleSubmit(newBlocks);
+          }}
+          onEditCancel={() => {
+            setEditNode(undefined);
+          }}
+        />
+      ));
+    }
+
+    const description = search ? "Нет данных по запросу" : "Идет обработка...";
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={
+          pageData?.fullText?.length === 0
+            ? "Не удалось распознать текст"
+            : description
+        }
+        style={{ marginTop: 65 }}
+      />
+    );
+  }, [pageData, selectedNode, editNode, handleSubmit, search]);
+
+  const items: CollapseProps["items"] = [
+    {
+      key: "text",
+      label: (
+        <Typography.Title level={5} style={{ margin: 0, fontWeight: 650 }}>
+          Текст образа
+        </Typography.Title>
+      ),
+      children: <Card className="text-card">{textBlocks}</Card>,
+    },
+    {
+      key: "attributes",
+      label: (
+        <Typography.Title level={5} style={{ margin: 0, fontWeight: 650 }}>
+          Атрибуты образа
+        </Typography.Title>
+      ),
+      children: (
+        <Card className="attributes-card">
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={
+              <span>
+                Атрибутивное распознавание
+                <br />
+                не поддерживается
+              </span>
+            }
+          />
+        </Card>
+      ),
+    },
+  ];
 
   return (
     <Flex vertical gap={24} style={{ paddingBottom: 24 }}>
@@ -226,7 +245,9 @@ export const PageViewer = ({ documentId, documentData }: PageViewerProps) => {
           <Button
             type="text"
             icon={<BackArrowIcon />}
-            onClick={() => navigate(`/${documentId}`)}
+            onClick={() =>
+              navigate(ROUTE_PATHS.DOCUMENT.replace(":id", documentId))
+            }
             style={{ color: "var(--secondary-color)", width: 28, height: 28 }}
           />
           <Typography.Title level={5} style={{ fontSize: 18, margin: 0 }}>
@@ -234,21 +255,21 @@ export const PageViewer = ({ documentId, documentData }: PageViewerProps) => {
           </Typography.Title>
         </Flex>
         <Flex align="center" justify="space-between">
-          {!(!documentData || isLoading) ? (
+          {!(!documentData || isLoading || (isFetching && !isRefetching)) ? (
             <Flex gap={20}>
               <Typography.Text>
                 Уверенность:{" "}
                 <span
                   style={{
                     fontWeight: 600,
-                    color: getConfidenceColor(
+                    color: getConfidenceObj(
                       avgConfidence,
-                      documentData?.min ?? 5,
-                      documentData?.max ?? 95,
-                    ),
+                      documentData?.min,
+                      documentData?.max
+                    ).color,
                   }}
                 >
-                  {avgConfidence.toFixed(2)}%
+                  {avgConfidence === 0 ? "—" : `${avgConfidence.toFixed(2)}%`}
                 </span>
               </Typography.Text>
               <Typography.Text type="secondary">
@@ -260,33 +281,66 @@ export const PageViewer = ({ documentId, documentData }: PageViewerProps) => {
           )}
           <Pagination
             simple
-            size="small"
             current={pageNumber}
             onChange={(page) => {
-              navigate(`/${documentId}/${page}`);
+              navigate(
+                ROUTE_PATHS.DOCUMENT_PAGE.replace(":id", documentId).replace(
+                  ":number",
+                  String(page)
+                )
+              );
             }}
             total={data?.total}
             pageSize={1}
             showSizeChanger={false}
           />
+          <Button
+            color="primary"
+            variant="outlined"
+            disabled={!pageData?.fullText?.length}
+            icon={<DownloadOutlined />}
+            onClick={() => setIsModalOpen(true)}
+          >
+            Экспорт
+          </Button>
         </Flex>
       </Flex>
-      <Splitter
-        onResizeStart={() => setSelectedNode(undefined)}
-        style={{ gap: 8, minHeight: "calc(100vh - 400px)" }}
-      >
-        <Splitter.Panel defaultSize="55%" min="30%" max="70%">
-          <ImageViewer url={pageData?.original} selectedNode={selectedNode} />
-        </Splitter.Panel>
-        <Splitter.Panel>
-          <Collapse
-            ghost
-            className="pagedata-collapse"
-            defaultActiveKey={["text", "attributes"]}
-            items={items}
-          />
-        </Splitter.Panel>
-      </Splitter>
+      <Spin spinning={isLoading || (isFetching && !isRefetching)}>
+        <Splitter
+          onResizeStart={() => setSelectedNode(undefined)}
+          style={{ gap: 8, minHeight: "calc(100vh - 400px)" }}
+        >
+          <Splitter.Panel defaultSize="55%" min="30%" max="70%">
+            <ImageViewer
+              url={pageData?.original}
+              selectedNode={selectedNode}
+              min={documentData?.min}
+              max={documentData?.max}
+              zoomBlockId={zoomBlockId}
+              resetZoom={() => setZoomBlockId(undefined)}
+            />
+          </Splitter.Panel>
+          <Splitter.Panel>
+            <Collapse
+              ghost
+              className="pagedata-collapse"
+              expandIconPosition="end"
+              defaultActiveKey={["text"]}
+              items={items}
+            />
+          </Splitter.Panel>
+        </Splitter>
+      </Spin>
+      <ExportModal
+        isOpen={isModalOpen}
+        documentId={documentId}
+        code={documentData?.code}
+        imageUrl={pageData?.original}
+        pageNumber={pageNumber}
+        fullText={pageData?.fullText}
+        attrs={pageData?.attrs}
+        onClose={() => setIsModalOpen(false)}
+      />
     </Flex>
   );
 };

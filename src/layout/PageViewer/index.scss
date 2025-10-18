@@ -8,7 +8,7 @@
   }
 
   .text-card {
-    height: 300px;
+    max-height: calc(100vh - 516px);
     overflow: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--light-hover-grey-color) transparent;
@@ -27,5 +27,29 @@
     font-size: 13px;
     height: 26px;
     padding: 4px 10px;
+  }
+}
+
+.ant-pagination-simple-pager {
+  input {
+    height: 28px !important;
+  }
+}
+
+.confidence-label {
+  position: absolute;
+  background-color: var(--bg-color);
+  bottom: 0;
+  right: 8px;
+  padding: 5px 14px 0;
+  border-radius: 8px 0;
+  gap: 2px;
+  border-top: 1px solid rgb(240, 240, 240);
+  border-left: 1px solid rgb(240, 240, 240);
+
+  .ant-typography {
+    font-size: 13px;
+    letter-spacing: 0.01rem;
+    color: var(--secondary-color);
   }
 }

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { isAxiosError } from "axios";
 import {
   App,
   Modal,
@@ -26,7 +27,7 @@ type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
 
 interface UploadModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (success?: boolean) => void;
 }
 
 export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
@@ -41,7 +42,6 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
   const uploadMutation = useMutation({
     mutationFn: async (values: UploadFormType) => {
       const formData = new FormData();
-
       fileList.forEach((file) => {
         formData.append("file", file as FileType);
       });
@@ -53,7 +53,7 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        },
+        }
       );
     },
     onSuccess: () => {
@@ -62,12 +62,14 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
         exact: false,
       });
       handleSuccess(notification);
-      onClose();
+      onClose(true);
       setFileList([]);
       form.resetFields();
     },
-    onError: () => {
-      handleError(notification);
+    onError: (e) => {
+      if (!isAxiosError(e) || e.status !== 504) {
+        handleError(notification);
+      }
     },
   });
   const handleSubmit = (values: UploadFormType) => {
@@ -154,6 +156,7 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
                 e.stopPropagation();
               }}
               onChange={(value) => setUploadMode(value)}
+              style={{ marginLeft: 4 }}
             />
           </div>
           <p className="ant-upload-hint">
@@ -176,7 +179,7 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
         </Form.Item>
         <Form.Item
           name="min"
-          initialValue={5}
+          initialValue={30}
           label="Нижний порог уверенности"
           tooltip="Все элементы ниже этого уровня относятся к категории низкой уверенности"
           dependencies={["max"]}
@@ -187,7 +190,7 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
                 const max = getFieldValue("max");
                 if (value !== undefined && max !== undefined && value >= max) {
                   return Promise.reject(
-                    new Error("Минимум не может быть больше максимума"),
+                    new Error("Минимум не может быть больше максимума")
                   );
                 }
                 return Promise.resolve();
@@ -200,7 +203,7 @@ export const UploadModal = ({ isOpen, onClose }: UploadModalProps) => {
         </Form.Item>
         <Form.Item
           name="max"
-          initialValue={95}
+          initialValue={85}
           label="Верхний порог уверенности"
           tooltip="Все элементы выше этого уровня относятся к категории высокой уверенности"
           rules={[{ required: true, message: "Обязательно для заполнения" }]}

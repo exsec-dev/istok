@@ -6,8 +6,10 @@ import type { TableColumnsType, TableProps } from "antd";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StatusLabel, DeleteIcon, DownloadIcon, UploadModal } from "components";
 import {
+  ROUTE_PATHS,
   useAxios,
   useDebouncedState,
+  useSessionCount,
   formatDate,
   handleError,
   handleSuccess,
@@ -18,13 +20,14 @@ import "./index.scss";
 export const DocumentsTable = () => {
   const axios = useAxios();
   const navigate = useNavigate();
-  const { notification } = App.useApp();
+  const { notification, modal } = App.useApp();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sessionCount, setSessionCount] = useSessionCount();
 
   const [search, setSearch, debouncedSearch] = useDebouncedState<string>(
     "",
-    500,
+    500
   );
   const [sortBy, setSortBy] = useState<string>();
   const [statusFilter, setStatusFilter] = useState<StatusType>();
@@ -36,41 +39,45 @@ export const DocumentsTable = () => {
   const {
     data: tableData,
     isLoading,
-    isFetching,
     refetch,
   } = useQuery<GetDTO<DocumentType>>({
-    queryKey: ["/documents", debouncedSearch, pagination, sortBy, statusFilter],
+    queryKey: [
+      "/documents",
+      debouncedSearch.trim(),
+      pagination,
+      sortBy,
+      statusFilter,
+    ],
     queryFn: async () => {
-      try {
-        const { data } = await axios.get("/documents", {
-          params: {
-            ...pagination,
-            sortBy,
-            query: debouncedSearch,
-            status: statusFilter,
-          },
-        });
-        return data;
-      } catch (e) {
-        handleError(notification);
-        return [];
-      }
+      const { data } = await axios.get("/documents", {
+        params: {
+          ...pagination,
+          sortBy,
+          query: debouncedSearch.trim(),
+          status: statusFilter,
+        },
+      });
+      return data;
     },
     refetchOnWindowFocus: false,
     retry: 0,
-    // refetchInterval: 1000,
+    refetchInterval: (query) =>
+      query.state.data?.data.some((doc) => doc.status === "processing")
+        ? 2500
+        : false,
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       return Promise.all(
         ids.map((id) =>
-          axios.delete("/documents", { params: { documentId: id } }),
-        ),
+          axios.delete("/documents", { params: { documentId: id } })
+        )
       );
     },
     onSuccess: () => {
       refetch();
+      setSelectedIds([]);
       handleSuccess(notification);
     },
     onError: () => {
@@ -79,14 +86,33 @@ export const DocumentsTable = () => {
   });
   const handleDelete = useCallback(
     (ids: string[]) => {
-      return deleteMutation.mutateAsync(ids);
+      modal.confirm({
+        title: `Удалить документ${ids.length > 1 ? "ы" : ""}?`,
+        width: 400,
+        cancelText: "Отмена",
+        okText: "Удалить",
+        okButtonProps: { danger: true },
+        onOk: () => deleteMutation.mutateAsync(ids),
+      });
     },
-    [deleteMutation],
+    [deleteMutation, modal]
   );
 
+  const downloadMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return Promise.all(ids.map((id) => axios.get(`/documents/${id}/export`)));
+    },
+    onSuccess: () => {
+      // TODO
+      setSelectedIds([]);
+      handleSuccess(notification);
+    },
+    onError: () => {
+      handleError(notification);
+    },
+  });
   const handleDownload = useCallback((ids: string[]) => {
-    console.log("download docs: ", ids);
-    // return deleteMutation.mutateAsync(ids);
+    return downloadMutation.mutateAsync(ids);
   }, []);
 
   const actions = useMemo(
@@ -114,7 +140,7 @@ export const DocumentsTable = () => {
         </Button>
       </Flex>
     ),
-    [selectedIds, handleDelete, handleDownload],
+    [selectedIds, handleDelete, handleDownload]
   );
 
   const columns = useMemo(
@@ -148,10 +174,9 @@ export const DocumentsTable = () => {
                 >
                   <Typography.Link
                     ellipsis
-                    // disabled={record.Status === "processing"}
                     onClick={(e) => {
                       e.preventDefault();
-                      navigate(`/${record.id}`);
+                      navigate(ROUTE_PATHS.DOCUMENT.replace(":id", record.id));
                     }}
                   >
                     {text}
@@ -181,10 +206,7 @@ export const DocumentsTable = () => {
                 },
               ],
               render: (_: any, record: DocumentType) => (
-                <StatusLabel
-                  status={record.status}
-                  progress={record.progress}
-                />
+                <StatusLabel status={record.status} />
               ),
             },
             {
@@ -201,12 +223,11 @@ export const DocumentsTable = () => {
               dataIndex: "id",
               width: 104,
               className: "actions-column",
-              render: (id: string, record: DocumentType) => (
+              render: (id: string) => (
                 <Flex gap={8} justify="flex-end">
                   <Button
                     color="primary"
                     variant="text"
-                    disabled={record.status === "processing"}
                     icon={<DownloadIcon />}
                     onClick={() => handleDownload([id])}
                   />
@@ -222,7 +243,7 @@ export const DocumentsTable = () => {
           ],
         },
       ] as TableColumnsType<DocumentType>,
-    [actions, navigate, handleDelete, handleDownload],
+    [actions, navigate, handleDelete, handleDownload]
   );
 
   const paginationConfig = useMemo<TableProps["pagination"]>(() => {
@@ -246,20 +267,18 @@ export const DocumentsTable = () => {
       },
       showTotal: (total) => (
         <Flex gap={24} align="center" style={{ height: "100%" }}>
-          <Typography.Text>Всего документов: {total}</Typography.Text>
-          <Typography.Text type="secondary">
-            Загружено за сеанс: {total}
-          </Typography.Text>
+          <Typography.Text strong>Всего документов: {total}</Typography.Text>
+          <Typography.Text>Загружено за сеанс: {sessionCount}</Typography.Text>
         </Flex>
       ),
     };
-  }, [pagination, tableData]);
+  }, [pagination, tableData, sessionCount]);
 
   return (
     <Flex vertical gap={16}>
       <Flex gap={24} style={{ width: "100%" }}>
         <Input
-          placeholder="Поиск"
+          placeholder="Поиск по названию"
           value={search}
           prefix={
             <SearchOutlined
@@ -282,7 +301,7 @@ export const DocumentsTable = () => {
       <Table<DocumentType>
         rowKey="id"
         columns={columns}
-        loading={isLoading || isFetching}
+        loading={isLoading}
         dataSource={tableData?.data ?? []}
         rowSelection={{
           type: "checkbox",
@@ -301,12 +320,20 @@ export const DocumentsTable = () => {
           setSortBy(
             sorter.field
               ? `${sorter.order === "descend" ? "-" : ""}${sorter.field.toString()}`
-              : "",
+              : ""
           );
         }}
-        scroll={{ y: "calc(100vh - 380px)" }}
+        scroll={{ x: "870px", y: "calc(100vh - 380px)" }}
       />
-      <UploadModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <UploadModal
+        isOpen={isModalOpen}
+        onClose={(success) => {
+          if (success) {
+            setSessionCount((value) => value + 1);
+          }
+          setIsModalOpen(false);
+        }}
+      />
     </Flex>
   );
 };

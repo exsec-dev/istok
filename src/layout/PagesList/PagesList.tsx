@@ -3,16 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { App, Empty, Skeleton, List, Card, Image, Spin } from "antd";
 import { LoadingOutlined } from "@ant-design/icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useAxios, handleError } from "utils";
+import {
+  ROUTE_PATHS,
+  FALLBACK_IMAGE,
+  useAxios,
+  handleError,
+  type StatusType,
+} from "utils";
 import "./index.scss";
 
 const PAGE_SIZE = 25;
 
 interface PagesListProps {
   documentId: string;
+  status?: StatusType;
 }
 
-export const PagesList = ({ documentId }: PagesListProps) => {
+export const PagesList = ({ documentId, status }: PagesListProps) => {
   const axios = useAxios();
   const navigate = useNavigate();
   const { notification } = App.useApp();
@@ -48,6 +55,7 @@ export const PagesList = ({ documentId }: PagesListProps) => {
     initialPageParam: 0,
     refetchOnWindowFocus: false,
     retry: 0,
+    refetchInterval: status === "processing" ? 2000 : false,
   });
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -63,7 +71,7 @@ export const PagesList = ({ documentId }: PagesListProps) => {
           fetchNextPage();
         }
       },
-      { rootMargin: "1px 0px 1px 0px", threshold: 0 },
+      { rootMargin: "1px 0px 1px 0px", threshold: 0 }
     );
 
     observer.observe(el);
@@ -85,12 +93,17 @@ export const PagesList = ({ documentId }: PagesListProps) => {
           <List
             grid={{ gutter: 16, xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 7 }}
             dataSource={items}
-            renderItem={(item) => (
+            renderItem={(item, i) => (
               <List.Item key={item?.id}>
                 <Card
                   hoverable
                   onClick={() => {
-                    navigate(`/${documentId}/${item?.number + 1}`);
+                    navigate(
+                      ROUTE_PATHS.DOCUMENT_PAGE.replace(
+                        ":id",
+                        documentId
+                      ).replace(":number", String(i + 1))
+                    );
                   }}
                   styles={{
                     body: {
@@ -101,24 +114,26 @@ export const PagesList = ({ documentId }: PagesListProps) => {
                   }}
                   style={{
                     width: "fit-content",
+                    minWidth: 100,
                     margin: "auto",
                     borderColor: "var(--header-text-color)",
+                    backgroundColor: "var(--header-text-color)",
                     borderRadius: 10,
                     borderWidth: 2,
                   }}
                 >
                   <Image
                     src={item?.thumb}
+                    fallback={FALLBACK_IMAGE}
                     preview={false}
-                    placeholder={
-                      <Skeleton.Image
-                        active
-                        style={{ width: "100%", height: 150 }}
-                      />
-                    }
-                    style={{ borderRadius: 8 }}
+                    style={{
+                      width: "100%",
+                      height: 160,
+                      objectFit: "cover",
+                      borderRadius: 8,
+                    }}
                   />
-                  <div className="image-label">{item?.number + 1}</div>
+                  <div className="image-label">{i + 1}</div>
                 </Card>
               </List.Item>
             )}

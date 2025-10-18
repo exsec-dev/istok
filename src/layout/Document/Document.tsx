@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { App, Flex, Empty, Skeleton } from "antd";
 import { useQuery } from "@tanstack/react-query";
@@ -9,22 +9,20 @@ import type { DocumentType } from "utils";
 import { handleError, useAxios } from "utils";
 
 interface DocumentProps {
-  isSinglePage?: boolean;
+  isPageView?: boolean;
 }
 
-export const Document = ({ isSinglePage }: DocumentProps) => {
+export const Document = ({ isPageView }: DocumentProps) => {
   const { id } = useParams();
   const axios = useAxios();
   const { notification } = App.useApp();
-  // const [search, setSearch] = useState<string>("");
+  const [search, setSearch] = useState<string>("");
 
-  const { data: documentData, isLoading } = useQuery<DocumentType | undefined>({
-    queryKey: ["/documents/{id}", id],
+  const { data: documentData, isLoading } = useQuery<DocumentType>({
+    queryKey: ["/documents/{documentId}", id],
     queryFn: async () => {
       try {
-        const { data } = await axios.get<{ data: DocumentType }>(
-          `/documents/${id}`,
-        );
+        const { data } = await axios.get(`/documents/${id}`);
         return data.data;
       } catch (e) {
         handleError(notification);
@@ -33,6 +31,8 @@ export const Document = ({ isSinglePage }: DocumentProps) => {
     },
     refetchOnWindowFocus: false,
     retry: 0,
+    refetchInterval: (query) =>
+      query.state.data?.status === "processing" ? 2000 : false,
   });
 
   return id ? (
@@ -43,14 +43,17 @@ export const Document = ({ isSinglePage }: DocumentProps) => {
         <DocumentHeader
           id={id}
           documentData={documentData}
-          // setSearch={setSearch}
-          setSearch={() => {}}
+          setSearch={setSearch}
         />
       )}
-      {isSinglePage ? (
-        <PageViewer documentId={id} documentData={documentData} />
+      {isPageView ? (
+        <PageViewer
+          documentId={id}
+          documentData={documentData}
+          search={search.toLocaleLowerCase()}
+        />
       ) : (
-        <PagesList documentId={id} />
+        <PagesList documentId={id} status={documentData?.status} />
       )}
     </Flex>
   ) : (

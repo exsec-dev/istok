@@ -5,10 +5,10 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { Button, Flex } from "antd";
+import { Button, Flex, Typography } from "antd";
 import {
-  PlusOutlined,
-  MinusOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
   ColumnWidthOutlined,
 } from "@ant-design/icons";
 import {
@@ -17,14 +17,25 @@ import {
   type ReactZoomPanPinchContentRef,
 } from "react-zoom-pan-pinch";
 import { HighlightBlock } from "components";
-import { type TextType, type PointsType } from "utils";
+import { getConfidenceObj, type TextType, type PointsType } from "utils";
 
 interface ImageViewerProps {
   url?: string;
+  min?: number;
+  max?: number;
   selectedNode?: TextType;
+  zoomBlockId?: string;
+  resetZoom: () => void;
 }
 
-export const ImageViewer = ({ url, selectedNode }: ImageViewerProps) => {
+export const ImageViewer = ({
+  url,
+  min,
+  max,
+  selectedNode,
+  zoomBlockId,
+  resetZoom,
+}: ImageViewerProps) => {
   const [scale, setScale] = useState(1);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const apiRef = useRef<ReactZoomPanPinchContentRef | null>(null);
@@ -63,54 +74,63 @@ export const ImageViewer = ({ url, selectedNode }: ImageViewerProps) => {
     api.setTransform(tx, ty, s, 0);
   }, []);
 
-  const zoomToBlock = useCallback((points: PointsType) => {
-    const api = apiRef.current;
-    const wrap = api?.instance?.wrapperComponent;
-    const img = imgRef.current;
-    if (!api || !wrap || !img || !points || points.length !== 4) return;
+  const zoomToBlock = useCallback(
+    (points: PointsType) => {
+      const api = apiRef.current;
+      const wrap = api?.instance?.wrapperComponent;
+      const img = imgRef.current;
+      if (!api || !wrap || !img || !points || points.length !== 4) return;
 
-    const cw = wrap.clientWidth;
-    const ch = wrap.clientHeight;
+      const cw = wrap.clientWidth;
+      const ch = wrap.clientHeight;
 
-    // ограничивающий прямоугольник четырёхугольника
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    for (const p of points) {
-      if (p.x < minX) minX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y > maxY) maxY = p.y;
-    }
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
 
-    const bw = Math.max(1, maxX - minX);
-    const bh = Math.max(1, maxY - minY);
+      const bw = Math.max(1, maxX - minX);
+      const bh = Math.max(1, maxY - minY);
 
-    // паддинг вокруг выделения
-    const padding = 24;
-    const availW = Math.max(1, cw - 2 * padding);
-    const availH = Math.max(1, ch - 2 * padding);
+      const padding = 24;
+      const availW = Math.max(1, cw - 2 * padding);
+      const availH = Math.max(1, ch - 2 * padding);
 
-    // абсолютный масштаб, чтобы влезло по меньшей стороне
-    const s = Math.min(availW / bw, availH / bh);
+      const s = Math.min(availW / bw, availH / bh);
 
-    // центр ограничивающего прямоугольника в координатах контента
-    const cx = minX + bw / 2;
-    const cy = minY + bh / 2;
+      const cx = minX + bw / 2;
+      const cy = minY + bh / 2;
 
-    // переносим так, чтобы центр блока оказался в центре вьюпорта
-    const tx = cw / 2 - cx * s;
-    const ty = ch / 2 - cy * s;
+      const tx = cw / 2 - cx * s;
+      const ty = ch / 2 - cy * s;
 
-    api.setTransform(tx, ty, s, 200);
-  }, []);
+      api.setTransform(tx, ty, s, 200);
+      resetZoom();
+    },
+    [resetZoom]
+  );
 
   useEffect(() => {
-    if (highlightPoints) {
+    if (zoomBlockId && highlightPoints) {
       zoomToBlock(highlightPoints);
     }
-  }, [highlightPoints, zoomToBlock]);
+  }, [zoomBlockId, zoomToBlock]);
+
+  useEffect(() => {
+    fitWidth();
+  }, [url, fitWidth]);
+
+  const { color, icon } = getConfidenceObj(
+    (selectedNode?.confidence ?? 0) * 100,
+    min,
+    max
+  );
 
   return (
     <div
@@ -128,7 +148,7 @@ export const ImageViewer = ({ url, selectedNode }: ImageViewerProps) => {
         maxScale={10}
         centerOnInit
         disablePadding
-        wheel={{ step: 0.2, smoothStep: 0.004 }}
+        wheel={{ step: 0.2, smoothStep: 0.002 }}
         doubleClick={{ mode: "zoomIn", step: 0.8 }}
         onTransformed={({ state }) => setScale(state.scale)}
       >
@@ -138,8 +158,8 @@ export const ImageViewer = ({ url, selectedNode }: ImageViewerProps) => {
               gap={8}
               style={{ position: "absolute", zIndex: 1, padding: "8px 12px" }}
             >
-              <Button icon={<PlusOutlined />} onClick={() => zoomIn()} />
-              <Button icon={<MinusOutlined />} onClick={() => zoomOut()} />
+              <Button icon={<ZoomInOutlined />} onClick={() => zoomIn()} />
+              <Button icon={<ZoomOutOutlined />} onClick={() => zoomOut()} />
               <Button icon={<ColumnWidthOutlined />} onClick={fitWidth} />
             </Flex>
             <TransformComponent
@@ -162,19 +182,28 @@ export const ImageViewer = ({ url, selectedNode }: ImageViewerProps) => {
                 style={{ display: "block" }}
               />
               {highlightPoints && (
-                // <div
-                //   style={{
-                //     position: "absolute",
-                //     border: `${Math.max(1, 2 / scale)}px solid var(--light-hover-blue-color)`,
-                //     backgroundColor: "#e1eaf930",
-                //     pointerEvents: "none",
-                //     opacity: 0.9,
-                //     ...highlightStyle,
-                //   }}
-                // />
-                <HighlightBlock scale={scale} points={highlightPoints} />
+                <HighlightBlock
+                  scale={scale}
+                  points={highlightPoints}
+                  color={color}
+                />
               )}
             </TransformComponent>
+            {selectedNode ? (
+              <Flex className="confidence-label">
+                {selectedNode.edited ? (
+                  <Typography.Text>Отредактировано</Typography.Text>
+                ) : (
+                  <>
+                    <Typography.Text>
+                      Уверенность элемента:{" "}
+                      {(selectedNode.confidence * 100).toFixed()}%
+                    </Typography.Text>
+                    {icon}
+                  </>
+                )}
+              </Flex>
+            ) : null}
           </>
         )}
       </TransformWrapper>

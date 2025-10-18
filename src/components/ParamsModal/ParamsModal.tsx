@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { App, Modal, Form, InputNumber, Input } from "antd";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CodeInput } from "components/UploadModal/CodeInput";
 import {
   useAxios,
   handleError,
@@ -26,43 +27,46 @@ export const ParamsModal = ({
   const { notification } = App.useApp();
   const [form] = Form.useForm<UploadFormType>();
 
+  useEffect(() => {
+    form.resetFields();
+  }, [form, initialData]);
+
   const changeMutation = useMutation({
     mutationFn: async (values: UploadFormType) => {
-      // return await axios.post(`/documents/${id}`, {
-      //   file: null,
-      // });
+      return await axios.patch(`/documents/${id}`, values);
     },
-    onSuccess: () => {
-      // queryClient.invalidateQueries({
-      //   queryKey: ["/documents/get"],
-      //   exact: false,
-      // });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["/documents/{documentId}", id],
+      });
       handleSuccess(notification);
       onClose();
-      form.resetFields();
     },
     onError: () => {
       handleError(notification);
     },
   });
   const handleSubmit = (values: UploadFormType) => {
-    console.log("update doc: ", values);
     return changeMutation.mutateAsync(values);
   };
 
   return (
     <Modal
       open={isOpen}
-      title="Настройка документа"
+      title="Параметры документа"
       okText="Сохранить"
       onCancel={() => {
         onClose();
         form.resetFields();
       }}
       onOk={form.submit}
+      okButtonProps={{
+        loading: changeMutation.isPending,
+      }}
       maskClosable={false}
       getContainer="#root"
       destroyOnHidden
+      forceRender
     >
       <Form
         form={form}
@@ -90,6 +94,20 @@ export const ParamsModal = ({
           <Input placeholder="Название документа" />
         </Form.Item>
         <Form.Item
+          name="code"
+          label="Архивный шифр"
+          rules={[
+            { required: true, message: "Обязательно для заполнения" },
+            {
+              pattern: /^\d{1,4}-\d{1,4}-\d{1,6}$/,
+              message: "Неверный формат данных",
+            },
+          ]}
+          style={{ marginTop: 24 }}
+        >
+          <CodeInput />
+        </Form.Item>
+        <Form.Item
           name="min"
           label="Нижний порог уверенности"
           tooltip="Все элементы ниже этого уровня относятся к категории низкой уверенности"
@@ -101,7 +119,7 @@ export const ParamsModal = ({
                 const max = getFieldValue("max");
                 if (value !== undefined && max !== undefined && value >= max) {
                   return Promise.reject(
-                    new Error("Минимум не может быть больше максимума"),
+                    new Error("Минимум не может быть больше максимума")
                   );
                 }
                 return Promise.resolve();

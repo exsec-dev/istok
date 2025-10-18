@@ -36,6 +36,9 @@ export const getTheme = (): ConfigProviderProps["theme"] => {
       Progress: {
         defaultColor: "var(--primary-color)",
       },
+      Popconfirm: {
+        fontSize: 13,
+      },
     },
   };
 };

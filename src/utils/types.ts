@@ -23,9 +23,20 @@ export type UploadFormType = {
   max: number;
 };
 
+export type Attribute = "name" | "address" | "date";
+
+export type ExportFormType = {
+  format: "csv" | "xlsx" | "xml";
+  source: "text" | "attrs";
+  attrs?: Attribute[];
+  includeCode: boolean;
+  includeConf: boolean;
+};
+
 export type TextType = {
   id: string;
   text: string;
+  confidence: number;
   x1: number;
   y1: number;
   x2: number;
@@ -34,11 +45,12 @@ export type TextType = {
   y3: number;
   x4: number;
   y4: number;
+  edited?: boolean;
 };
 
-export type AttributesType = {
+export type AttributeType = {
   id: string;
-  name: string;
+  name: Attribute;
   value: string;
   confidence: number;
   x1: number;
@@ -55,15 +67,12 @@ type Point = { x: number; y: number };
 export type PointsType = [Point, Point, Point, Point];
 
 export type PageDataType = {
-  data: {
-    id: string;
-    thumb: string;
-    original: string;
-    number: number;
-    fullText: TextType[];
-    attrs: AttributesType[];
-  }[];
-  total: number;
+  id: string;
+  thumb: string;
+  original: string;
+  number: number;
+  fullText: TextType[];
+  attrs: AttributeType[];
 };
 
 export type GetDTO<T> = {

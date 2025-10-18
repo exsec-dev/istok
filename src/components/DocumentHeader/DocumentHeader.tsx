@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { App, Typography, Tooltip, Button, Flex, Input } from "antd";
 import { StatusLabel, ParamsIcon, CopyIcon } from "components";
 import {
@@ -11,7 +12,7 @@ import { ParamsModal } from "components/ParamsModal";
 
 interface DocumentHeaderProps {
   id: string;
-  documentData: DocumentType | undefined;
+  documentData?: DocumentType;
   setSearch: (value: string) => void;
 }
 
@@ -21,6 +22,7 @@ export const DocumentHeader = ({
   setSearch,
 }: DocumentHeaderProps) => {
   const { notification } = App.useApp();
+  const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   const codeDetails = documentData?.code.split("-");
@@ -98,13 +100,14 @@ export const DocumentHeader = ({
             Дело: {codeDetails?.[2] ?? "-"}
           </Typography.Text>
         </Flex>
-        <Input.Search
-          allowClear
-          disabled
-          placeholder="Поиск по документу"
-          onSearch={setSearch}
-          style={{ flex: "1", maxWidth: 500, minWidth: 212 }}
-        />
+        {location.pathname.split("/").length === 4 ? (
+          <Input.Search
+            allowClear
+            placeholder="Поиск по тексту образа"
+            onSearch={setSearch}
+            style={{ flex: "1", maxWidth: 480, minWidth: 212 }}
+          />
+        ) : null}
       </Flex>
       <ParamsModal
         id={id}
