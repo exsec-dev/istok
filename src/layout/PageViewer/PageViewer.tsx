@@ -333,7 +333,7 @@ export const PageViewer = ({
           <Button
             color="primary"
             variant="outlined"
-            disabled={!pageData?.fullText?.length}
+            disabled={!pageData?.fullText?.length || isFullscreen}
             icon={<DownloadOutlined />}
             onClick={() => setIsModalOpen(true)}
           >
