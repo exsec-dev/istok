@@ -1,4 +1,11 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   App,
@@ -45,19 +52,28 @@ export const PageViewer = ({
   const axios = useAxios();
   const navigate = useNavigate();
   const { number } = useParams();
-  const pageNumber = number ? parseInt(number, 10) : 0;
+  const pageNumber = number ? parseInt(number, 10) : 1;
   const { notification } = App.useApp();
 
   const [selectedNode, setSelectedNode] = useState<TextType>();
   const [zoomBlockId, setZoomBlockId] = useState<string>();
   const [editNode, setEditNode] = useState<TextType>();
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  const isFullscreen = useSyncExternalStore(
+    (callback) => {
+      document.addEventListener("fullscreenchange", callback);
+      return () => document.removeEventListener("fullscreenchange", callback);
+    },
+    () => !!document.fullscreenElement
+  );
 
   useEffect(() => {
     setSelectedNode(undefined);
     setEditNode(undefined);
-  }, [pageNumber]);
+  }, [pageNumber, isFullscreen]);
 
   const { data, isLoading, isFetching, isRefetching, refetch } = useQuery<
     GetDTO<PageDataType>
@@ -212,7 +228,18 @@ export const PageViewer = ({
           Текст образа
         </Typography.Title>
       ),
-      children: <Card className="text-card">{textBlocks}</Card>,
+      children: (
+        <Card
+          className="text-card"
+          style={{
+            maxHeight: isFullscreen
+              ? "calc(100vh - 300px)"
+              : "calc(100vh - 516px)",
+          }}
+        >
+          {textBlocks}
+        </Card>
+      ),
     },
     {
       key: "attributes",
@@ -239,7 +266,16 @@ export const PageViewer = ({
   ];
 
   return (
-    <Flex vertical gap={24} style={{ paddingBottom: 24 }}>
+    <Flex
+      ref={containerRef}
+      vertical
+      gap={24}
+      style={{
+        padding: isFullscreen ? 40 : "0 0 24px",
+        backgroundColor: "var(--bg-color)",
+        overflow: isFullscreen ? "auto" : undefined,
+      }}
+    >
       <Flex vertical gap={12}>
         <Flex align="center" gap={8}>
           <Button
@@ -290,7 +326,7 @@ export const PageViewer = ({
                 )
               );
             }}
-            total={data?.total}
+            total={data?.total ?? pageNumber}
             pageSize={1}
             showSizeChanger={false}
           />
@@ -317,6 +353,8 @@ export const PageViewer = ({
               min={documentData?.min}
               max={documentData?.max}
               zoomBlockId={zoomBlockId}
+              containerRef={containerRef.current}
+              isFullscreen={isFullscreen}
               resetZoom={() => setZoomBlockId(undefined)}
             />
           </Splitter.Panel>

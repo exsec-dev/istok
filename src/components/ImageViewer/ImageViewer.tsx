@@ -10,6 +10,8 @@ import {
   ZoomInOutlined,
   ZoomOutOutlined,
   ColumnWidthOutlined,
+  FullscreenOutlined,
+  FullscreenExitOutlined,
 } from "@ant-design/icons";
 import {
   TransformWrapper,
@@ -25,6 +27,8 @@ interface ImageViewerProps {
   max?: number;
   selectedNode?: TextType;
   zoomBlockId?: string;
+  containerRef: HTMLDivElement | null;
+  isFullscreen: boolean;
   resetZoom: () => void;
 }
 
@@ -34,6 +38,8 @@ export const ImageViewer = ({
   max,
   selectedNode,
   zoomBlockId,
+  containerRef,
+  isFullscreen,
   resetZoom,
 }: ImageViewerProps) => {
   const [scale, setScale] = useState(1);
@@ -116,6 +122,28 @@ export const ImageViewer = ({
     [resetZoom]
   );
 
+  const openFullscreen = () => {
+    if (!containerRef) return;
+
+    if (containerRef.requestFullscreen) {
+      containerRef.requestFullscreen();
+    } else if ((containerRef as any).webkitRequestFullscreen) {
+      (containerRef as any).webkitRequestFullscreen();
+    } else if ((containerRef as any).msRequestFullscreen) {
+      (containerRef as any).msRequestFullscreen();
+    }
+  };
+
+  const closeFullscreen = () => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if ((document as any).webkitExitFullscreen) {
+      (document as any).webkitExitFullscreen();
+    } else if ((document as any).msExitFullscreen) {
+      (document as any).msExitFullscreen();
+    }
+  };
+
   useEffect(() => {
     if (zoomBlockId && highlightPoints) {
       zoomToBlock(highlightPoints);
@@ -161,6 +189,16 @@ export const ImageViewer = ({
               <Button icon={<ZoomInOutlined />} onClick={() => zoomIn()} />
               <Button icon={<ZoomOutOutlined />} onClick={() => zoomOut()} />
               <Button icon={<ColumnWidthOutlined />} onClick={fitWidth} />
+              <Button
+                icon={
+                  isFullscreen ? (
+                    <FullscreenExitOutlined />
+                  ) : (
+                    <FullscreenOutlined />
+                  )
+                }
+                onClick={isFullscreen ? closeFullscreen : openFullscreen}
+              />
             </Flex>
             <TransformComponent
               wrapperStyle={{
